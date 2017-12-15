@@ -50,7 +50,7 @@ class TestInitMethod:
         data = InitTestObject(foo_value, Bar=bar_value)
 
         assert data.Foo == foo_value
-        assert data.ValueWithDefault == default_value
+        assert data.ValueWithDefault == default_value  # TODO #55 should there be only one way to define default values?
         assert data.Bar == bar_value
 
     @given(st.text())
@@ -462,6 +462,61 @@ class TestDictionaryAccess:
         del data["WeirdValue"]
 
         assert not hasattr(data, "WeirdValue")
+
+
+class _AutoInitialisingObject(AWSObject):
+    """Test object with 2 attributes, where one is automatically initialised."""
+    AWS_ATTRIBUTES = {'auto', 'basic'}
+    ATTRIBUTE_INITIALISERS = {
+        "auto": list,
+    }
+
+    def __init__(self, auto=None, basic=None):
+        AWSObject.__init__(self, auto=auto, basic=basic)
+
+
+class TestAutomaticAttributeInitialisation:
+    """Verify behaviour of the auto-initialisation of attributes."""
+
+    #TODO reconsider terminology. this is essentially default values with bonus constructors. See #55
+
+    # TODO just collections, or anything? -> anything
+
+    def test_attribute_is_initialised_when_retrieved_if_not_set(self):
+        data = _AutoInitialisingObject()
+
+        # Exercise
+        assert data.auto == []
+
+    def test_attribute_doesnt_get_changed_if_already_set(self):
+        value = ['hello']
+        data = _AutoInitialisingObject(auto=value)
+
+        # Exercise
+        assert data.auto == value
+
+    def test_attribute_exists_even_if_not_set_yet(self):
+        data = _AutoInitialisingObject()
+
+        # Exercise
+        assert hasattr(data, 'auto')
+
+    def test_non_auto_initialise_attribute_still_throws_error_when_retrieved_if_not_set(self):
+        data = _AutoInitialisingObject()
+
+        # Exercise
+        with pytest.raises(AttributeError):
+            _ = data.basic
+
+    def test_nonexistent_attribute_still_throws_error_if_incorrectly_included_in_initialisation_list(self):
+        class _DataObject(ZeroAttributeObject):
+            ATTRIBUTE_INITIALISERS = dict(nonexistent=list)
+
+        data = _DataObject()
+
+        # Exercise
+        with pytest.raises(AttributeError):
+            _ = data.nonexistent
 
 
 class _NestedObject(DualAttributeObject):
